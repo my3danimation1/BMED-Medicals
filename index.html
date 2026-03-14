@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<!-- Disable Cloudflare email obfuscation -->
+<meta name="robots" content="noindex" data-cf-email-protection="off"/>
 <title>BMED — Bridge Medical Network Nigeria</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
@@ -1039,7 +1041,7 @@ footer{
   <div class="footer-bottom">
     <span>© 2026 Bridge Medical Network (BMED). All rights reserved.</span>
     <div class="footer-bottom-links">
-      <a href="mailto:info@bmed.ng">info@bmed.ng</a>
+      <a href="mailto:info@bmed.ng">info&#64;bmed.ng</a>
       <a href="tel:+2348000000000">+234 800 000 0000</a>
     </div>
   </div>
@@ -1101,124 +1103,385 @@ footer{
   </div>
 </div>
 
+
+
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-const SECS = ['hero','about','services','network','enquiry','contact'];
-const GS_URL = 'https://script.google.com/macros/s/AKfycbwkQgWkfnjb7V9qpxVSfAylcNfqw2YDXk74bD42lztyk-EWH-Q9Jz0Z7TLGecJdwHrxEQ/exec';
+/* ================================================================
+   1. CONFIGURATION & CONSTANTS
+   ================================================================ */
 
-// ===== SECTION SWITCH =====
+var CONFIG = {
+
+  // ============================================================
+  // PASTE YOUR GOOGLE APPS SCRIPT URL BELOW (between the quotes)
+  // ============================================================
+  GS_URL: 'https://script.google.com/macros/s/AKfycbyjyDnGhw-PG-oMe6t86dHLbDPcKatipDPk0zR1dDg8kK2sKX-C8KjHmXsXuY9cUtjyzQ/exec',
+  ADMIN_EMAIL : 'bamoglumide@gmail.com',
+  ADMIN_PASS  : 'admin123',
+  HOSP_EMAIL  : 'bamoglumide@gmail.com',
+  HOSP_PASS   : 'hosp123',
+  
+  ABOUT_MAP_CENTRE : [9.0, 8.0],
+  ABOUT_MAP_ZOOM   : 5,
+
+  
+  MAP_CITIES: [
+    [6.52,  3.38, 'Lagos'],
+    [9.06,  7.50, 'Abuja'],
+    [12.00, 8.59, 'Kano'],
+    [4.82,  7.05, 'Port Harcourt'],
+    [7.38,  3.95, 'Ibadan'],
+    [6.34,  5.60, 'Benin City'],
+  ],
+  
+  HQ_LAT   : 9.0579,
+  HQ_LNG   : 7.4951,
+  HQ_ZOOM  : 13,
+  HQ_LABEL : 'BMED HQ — Wuse II, Abuja, Nigeria',
+  TILE_DARK  : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  TILE_LIGHT : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+};
+
+/* ── All navigable section IDs — must match HTML id attributes ── */
+var SECTIONS = ['hero', 'about', 'services', 'network', 'enquiry', 'contact'];
+
+var DEMO_ENQUIRIES = [
+  { name: 'Amaka Obi',    loc: 'Enugu', need: 'Cardiology',        status: 'new'     },
+  { name: 'Tunde Bello',  loc: 'Lagos', need: 'Emergency Surgery',  status: 'pending' },
+  { name: 'Fatima Usman', loc: 'Kano',  need: 'Gynaecology',        status: 'new'     },
+  { name: 'Emeka Eze',    loc: 'Abuja', need: 'Neurology Consult',   status: 'pending' },
+];
+
+var _state = {
+  aboutMapReady   : false,
+  contactMapReady : false,
+};
+
+/* ================================================================
+   2. SECTION NAVIGATION
+   ================================================================ */
+
 function showSection(id) {
-  SECS.forEach(s => { var el=document.getElementById(s); if(el) el.classList.remove('active'); });
-  var el = document.getElementById(id);
-  if(el) el.classList.add('active');
-  document.querySelectorAll('.nav-links a[data-sec]').forEach(a => a.classList.toggle('nav-active', a.dataset.sec===id));
-  window.scrollTo({top:0,behavior:'smooth'});
+  SECTIONS.forEach(function (s) {
+    var el = document.getElementById(s);
+    if (el) el.classList.remove('active');
+  });
+  var target = document.getElementById(id);
+  if (target) target.classList.add('active');
+  document.querySelectorAll('.nav-links a[data-sec]').forEach(function (a) {
+    a.classList.toggle('nav-active', a.dataset.sec === id);
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   closeMenu();
   setTimeout(triggerReveal, 60);
-  if(id==='about' && !window._aMap) initAboutMap();
-  if(id==='contact' && !window._cMap) initContactMap();
+  if (id === 'about'   && !_state.aboutMapReady)   initAboutMap();
+  if (id === 'contact' && !_state.contactMapReady)  initContactMap();
 }
 
-// ===== MAPS =====
-function initAboutMap() {
-  window._aMap = true;
-  var m = L.map('about-map',{zoomControl:false,attributionControl:false}).setView([9.0,8.0],5);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(m);
-  [[6.52,3.38,'Lagos'],[9.06,7.5,'Abuja'],[12.0,8.59,'Kano'],[4.82,7.05,'Port Harcourt'],[7.38,3.95,'Ibadan'],[6.34,5.6,'Benin City']].forEach(function(c) {
-    L.circleMarker([c[0],c[1]],{radius:8,fillColor:'#0A6CF1',color:'#fff',weight:2,fillOpacity:0.9}).addTo(m).bindPopup('<b>'+c[2]+'</b><br/>BMED Active');
-  });
-}
-function initContactMap() {
-  window._cMap = true;
-  var m = L.map('contact-map',{zoomControl:true,attributionControl:false}).setView([9.0579,7.4951],13);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(m);
-  L.marker([9.0579,7.4951]).addTo(m).bindPopup('<b>BMED HQ</b><br/>Wuse II, Abuja, Nigeria').openPopup();
-}
+/* ================================================================
+   3. MOBILE HAMBURGER MENU
+   ================================================================ */
 
-// ===== REVEAL =====
-function triggerReveal() {
-  document.querySelectorAll('.page-section.active .reveal').forEach(function(el) {
-    el.classList.remove('visible'); void el.offsetWidth; el.classList.add('visible');
-  });
-}
-
-// ===== MENU =====
 function toggleMenu() {
-  var links=document.getElementById('navLinks');
-  var btn=document.getElementById('hBtn');
-  var spans=btn.querySelectorAll('span');
-  var open=links.classList.toggle('open');
-  spans[0].style.transform=open?'translateY(7px) rotate(45deg)':'none';
-  spans[1].style.opacity=open?'0':'1';
-  spans[2].style.transform=open?'translateY(-7px) rotate(-45deg)':'none';
-}
-function closeMenu() {
-  var links=document.getElementById('navLinks');
-  var btn=document.getElementById('hBtn');
-  if(!links||!btn) return;
-  var spans=btn.querySelectorAll('span');
-  links.classList.remove('open');
-  spans[0].style.transform='none'; spans[1].style.opacity='1'; spans[2].style.transform='none';
-}
-document.addEventListener('click',function(e){if(!document.getElementById('navbar').contains(e.target)) closeMenu();});
+  var links = document.getElementById('navLinks');
+  var btn   = document.getElementById('hBtn');
+  if (!links || !btn) return;
 
-// ===== ENQUIRY =====
+  var spans  = btn.querySelectorAll('span');
+  var isOpen = links.classList.toggle('open');
+
+  spans[0].style.transform = isOpen ? 'translateY(7px) rotate(45deg)'  : 'none';
+  spans[1].style.opacity   = isOpen ? '0'                               : '1';
+  spans[2].style.transform = isOpen ? 'translateY(-7px) rotate(-45deg)' : 'none';
+}
+
+function closeMenu() {
+  var links = document.getElementById('navLinks');
+  var btn   = document.getElementById('hBtn');
+  if (!links || !btn) return;
+
+  var spans = btn.querySelectorAll('span');
+  links.classList.remove('open');
+  spans[0].style.transform = 'none';
+  spans[1].style.opacity   = '1';
+  spans[2].style.transform = 'none';
+}
+document.addEventListener('click', function (e) {
+  var navbar = document.getElementById('navbar');
+  if (navbar && !navbar.contains(e.target)) closeMenu();
+});
+
+/* ================================================================
+   4. SCROLL-REVEAL ANIMATIONS
+   ================================================================ */
+
+function triggerReveal() {
+  document.querySelectorAll('.page-section.active .reveal').forEach(function (el) {
+    el.classList.remove('visible');
+    void el.offsetWidth;           // force layout reflow
+    el.classList.add('visible');
+  });
+}
+
+/* ================================================================
+   5. LEAFLET MAP — About Section  (Nigeria network overview)
+   ================================================================ */
+
+function initAboutMap() {
+  _state.aboutMapReady = true;
+
+  var map = L.map('about-map', {
+    zoomControl:        false,
+    attributionControl: false,
+  }).setView(CONFIG.ABOUT_MAP_CENTRE, CONFIG.ABOUT_MAP_ZOOM);
+
+  L.tileLayer(CONFIG.TILE_DARK, { maxZoom: 18 }).addTo(map);
+
+  CONFIG.MAP_CITIES.forEach(function (city) {
+    L.circleMarker([city[0], city[1]], {
+      radius:      8,
+      fillColor:   '#0A6CF1',   // BMED brand blue
+      color:       '#ffffff',
+      weight:      2,
+      fillOpacity: 0.9,
+    })
+      .addTo(map)
+      .bindPopup('<b>' + city[2] + '</b><br/>BMED Network Active');
+  });
+}
+
+/* ================================================================
+   6. LEAFLET MAP — Contact Section  (HQ location)
+   ================================================================ */
+
+function initContactMap() {
+  _state.contactMapReady = true;
+
+  var map = L.map('contact-map', {
+    zoomControl:        true,
+    attributionControl: false,
+  }).setView([CONFIG.HQ_LAT, CONFIG.HQ_LNG], CONFIG.HQ_ZOOM);
+
+  L.tileLayer(CONFIG.TILE_LIGHT, { maxZoom: 18 }).addTo(map);
+
+  L.marker([CONFIG.HQ_LAT, CONFIG.HQ_LNG])
+    .addTo(map)
+    .bindPopup('<b>BMED HQ</b><br/>' + CONFIG.HQ_LABEL)
+    .openPopup();
+}
+
+/* ================================================================
+   7. ENQUIRY FORM
+   ================================================================ */
+
 function submitEnquiry() {
-  var n=document.getElementById('e-name').value.trim();
-  var em=document.getElementById('e-email').value.trim();
-  var ph=document.getElementById('e-phone').value.trim();
-  var st=document.getElementById('e-state').value;
-  var nd=document.getElementById('e-need').value.trim();
-  if(!n||!em||!ph||!st||!nd){alert('Please fill in all required fields.');return;}
-  document.getElementById('enquiryForm').style.display='none';
-  document.getElementById('fSuccess').style.display='block';
-  if(GS_URL!=='YOUR_GOOGLE_APPS_SCRIPT_URL_HERE'){
-    fetch(GS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'enquiry',name:n,email:em,phone:ph,location:st,need:nd,date:new Date().toISOString()})}).catch(console.error);
+  var name  = document.getElementById('e-name').value.trim();
+  var email = document.getElementById('e-email').value.trim();
+  var phone = document.getElementById('e-phone').value.trim();
+  var state = document.getElementById('e-state').value;
+  var need  = document.getElementById('e-need').value.trim();
+  var msgEl = document.getElementById('e-msg');
+  var msg   = msgEl ? msgEl.value.trim() : '';
+  if (!name || !email || !phone || !state || !need) {
+    alert('Please fill in all required fields.');
+    return;
+  }
+  var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    alert('Please enter a valid email address.');
+    return;
+  }
+  document.getElementById('enquiryForm').style.display = 'none';
+  document.getElementById('fSuccess').style.display    = 'block';
+  if (CONFIG.GS_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+    fetch(CONFIG.GS_URL, {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify({
+        type    : 'enquiry',
+        name    : name,
+        email   : email,
+        phone   : phone,
+        location: state,
+        need    : need,
+        message : msg,
+        date    : new Date().toISOString(),
+      }),
+    }).catch(function (err) {
+      console.error('[BMED] Enquiry POST failed:', err);
+    });
   }
 }
+
 function resetEnquiry() {
-  ['e-name','e-email','e-phone','e-need','e-msg'].forEach(function(id){document.getElementById(id).value='';});
-  document.getElementById('e-state').value='';
-  document.getElementById('enquiryForm').style.display='block';
-  document.getElementById('fSuccess').style.display='none';
+  ['e-name', 'e-email', 'e-phone', 'e-need', 'e-msg'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('e-state').value            = '';
+  document.getElementById('enquiryForm').style.display = 'block';
+  document.getElementById('fSuccess').style.display   = 'none';
 }
 
-// ===== MODAL =====
-function openModal(){document.getElementById('modalBg').classList.add('open')}
-function closeModal(){document.getElementById('modalBg').classList.remove('open')}
-function handleModalBg(e){if(e.target===document.getElementById('modalBg')) closeModal()}
-function switchTab(type,btn){
-  document.querySelectorAll('.m-tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.m-panel').forEach(p=>p.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  else document.querySelectorAll('.m-tab')[type==='admin'?0:type==='hospital'?1:2].classList.add('active');
-  document.getElementById('p-'+type).classList.add('active');
-}
-function doLogin(type){
-  var em=document.getElementById(type==='admin'?'aEmail':'hEmail').value;
-  var pw=document.getElementById(type==='admin'?'aPass':'hPass').value;
-  var ok=type==='admin'?(em==='admin@bmed.ng'&&pw==='admin123'):(em==='hospital@bmed.ng'&&pw==='hosp123');
-  if(ok){closeModal();openDash(type);}else{alert('Invalid credentials.\nDemo: admin@bmed.ng / admin123');}
-}
-function doSignup(){alert('Registration submitted!\nOur team will review and activate your account within 24 hours.');closeModal();}
+/* ================================================================
+   8. PORTAL MODAL
+   ================================================================ */
 
-// ===== DASHBOARD =====
-var DEMO=[
-  {name:'Amaka Obi',loc:'Enugu',need:'Cardiology',st:'new'},
-  {name:'Tunde Bello',loc:'Lagos',need:'Emergency Surgery',st:'pending'},
-  {name:'Fatima Usman',loc:'Kano',need:'Gynaecology',st:'new'},
-  {name:'Emeka Eze',loc:'Abuja',need:'Neurology Consult',st:'pending'},
-];
-function openDash(type){
-  document.getElementById('dTitle').textContent=type==='admin'?'Admin Dashboard':'Hospital Dashboard';
-  document.getElementById('dTable').innerHTML=DEMO.map(function(r){return '<tr><td>'+r.name+'</td><td>'+r.loc+'</td><td>'+r.need+'</td><td><span class="spill spill-'+r.st+'">'+r.st+'</span></td></tr>';}).join('');
+function openModal() {
+  document.getElementById('modalBg').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalBg').classList.remove('open');
+}
+
+function handleModalBg(e) {
+  if (e.target === document.getElementById('modalBg')) closeModal();
+}
+
+function switchTab(type, btn) {
+  document.querySelectorAll('.m-tab').forEach(function (t) {
+    t.classList.remove('active');
+  });
+  document.querySelectorAll('.m-panel').forEach(function (p) {
+    p.classList.remove('active');
+  });
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    var tabIndex = (type === 'admin') ? 0 : (type === 'hospital') ? 1 : 2;
+    var allTabs  = document.querySelectorAll('.m-tab');
+    if (allTabs[tabIndex]) allTabs[tabIndex].classList.add('active');
+  }
+  var panel = document.getElementById('p-' + type);
+  if (panel) panel.classList.add('active');
+}
+
+/* ================================================================
+   9. PORTAL LOGIN
+   ================================================================ */
+
+function doLogin(type) {
+  var emailId  = type === 'admin' ? 'aEmail' : 'hEmail';
+  var passId   = type === 'admin' ? 'aPass'  : 'hPass';
+
+  var emailEl  = document.getElementById(emailId);
+  var passEl   = document.getElementById(passId);
+  if (!emailEl || !passEl) return;
+
+  var entered_email = emailEl.value.trim();
+  var entered_pass  = passEl.value;
+
+  var adminOk = (type === 'admin')    &&
+                (entered_email === CONFIG.ADMIN_EMAIL) &&
+                (entered_pass  === CONFIG.ADMIN_PASS);
+
+  var hospOk  = (type === 'hospital') &&
+                (entered_email === CONFIG.HOSP_EMAIL) &&
+                (entered_pass  === CONFIG.HOSP_PASS);
+
+  if (adminOk || hospOk) {
+    closeModal();
+    openDashboard(type);
+  } else {
+    alert(
+      'Invalid credentials.\n\n' +
+      'Demo Admin:    ' + CONFIG.ADMIN_EMAIL + '  /  ' + CONFIG.ADMIN_PASS + '\n' +
+      'Demo Hospital: ' + CONFIG.HOSP_EMAIL  + '  /  ' + CONFIG.HOSP_PASS
+    );
+  }
+}
+
+/* ================================================================
+   10. HOSPITAL REGISTRATION (SIGN-UP)
+   ================================================================ */
+
+function doSignup() {
+
+  /* ── Uncomment for production ─────────────────────────────────
+  var name  = document.querySelector('#p-signup input[placeholder="Hospital Name"]').value.trim();
+  var email = document.querySelector('#p-signup input[type="email"]').value.trim();
+  var phone = document.querySelector('#p-signup input[type="tel"]').value.trim();
+  var state = document.querySelector('#p-signup select').value;
+
+  if (!name || !email || !phone || !state) {
+    alert('Please fill in all fields to register.');
+    return;
+  }
+
+  if (CONFIG.GS_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
+    fetch(CONFIG.GS_URL, {
+      method  : 'POST',
+      headers : { 'Content-Type': 'application/json' },
+      body    : JSON.stringify({
+        type     : 'signup',
+        hospital : name,
+        email    : email,
+        phone    : phone,
+        state    : state,
+        date     : new Date().toISOString(),
+      }),
+    }).catch(function (err) {
+      console.error('[BMED] Signup POST failed:', err);
+    });
+  }
+  ─────────────────────────────────────────────────────────────── */
+
+  alert(
+    'Registration submitted!\n\n' +
+    'Our team will review your details and activate your\n' +
+    'account within 24 hours. A confirmation email will follow.'
+  );
+  closeModal();
+}
+
+/* ================================================================
+   11. ADMIN / HOSPITAL DASHBOARD
+   ================================================================ */
+
+function openDashboard(type) {
+  var titleEl = document.getElementById('dTitle');
+  if (titleEl) {
+    titleEl.textContent = (type === 'admin') ? 'Admin Dashboard' : 'Hospital Dashboard';
+  }
+  var tableEl = document.getElementById('dTable');
+  if (tableEl) {
+    tableEl.innerHTML = DEMO_ENQUIRIES.map(function (row) {
+      return (
+        '<tr>' +
+          '<td>' + row.name   + '</td>' +
+          '<td>' + row.loc    + '</td>' +
+          '<td>' + row.need   + '</td>' +
+          '<td>' +
+            '<span class="spill spill-' + row.status + '">' +
+              row.status +
+            '</span>' +
+          '</td>' +
+        '</tr>'
+      );
+    }).join('');
+  }
   document.getElementById('dashBg').classList.add('open');
 }
-function closeDash(){document.getElementById('dashBg').classList.remove('open')}
-function handleDashBg(e){if(e.target===document.getElementById('dashBg')) closeDash()}
 
-// ===== INIT =====
-showSection('hero');
+function closeDash() {
+  document.getElementById('dashBg').classList.remove('open');
+}
+
+function handleDashBg(e) {
+  if (e.target === document.getElementById('dashBg')) closeDash();
+}
+
+/* ================================================================
+   12. INITIALISATION
+   ================================================================ */
+
+(function init() {
+  showSection('hero');
+}());
 </script>
+
 </body>
 </html>
