@@ -1026,7 +1026,7 @@ footer{
         <li><a onclick="showSection('contact')">Contact Us</a></li>
         <li><a onclick="openModal()">Hospital Portal</a></li>
         <li><a onclick="openModal()">Admin Login</a></li>
-        <li><a href="mailto:info@bmed.ng">Email Us</a></li>
+        <li><a href="mailto:bamoglumide@gmail.com">Email Us</a></li>
       </ul>
     </div>
     <div class="footer-col">
@@ -1041,8 +1041,8 @@ footer{
   <div class="footer-bottom">
     <span>© 2026 Bridge Medical Network (BMED). All rights reserved.</span>
     <div class="footer-bottom-links">
-      <a href="mailto:info@bmed.ng">info&#64;bmed.ng</a>
-      <a href="tel:+2348000000000">+234 800 000 0000</a>
+      <a href="mailto:bamoglumide@gmail.com">bamoglumide@gmail.com</a>
+      <a href="tel:+2348146549628">+234 814 654 9468</a>
     </div>
   </div>
 </footer>
@@ -1117,10 +1117,10 @@ var CONFIG = {
   // ============================================================
   // PASTE YOUR GOOGLE APPS SCRIPT URL BELOW (between the quotes)
   // ============================================================
-  GS_URL: 'https://script.google.com/macros/s/AKfycbyjyDnGhw-PG-oMe6t86dHLbDPcKatipDPk0zR1dDg8kK2sKX-C8KjHmXsXuY9cUtjyzQ/exec',
-  ADMIN_EMAIL : 'bamoglumide@gmail.com',
+  GS_URL: 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE',
+  ADMIN_EMAIL : 'admin@bmed.ng',
   ADMIN_PASS  : 'admin123',
-  HOSP_EMAIL  : 'bamoglumide@gmail.com',
+  HOSP_EMAIL  : 'hospital@bmed.ng',
   HOSP_PASS   : 'hosp123',
   
   ABOUT_MAP_CENTRE : [9.0, 8.0],
@@ -1295,24 +1295,24 @@ function submitEnquiry() {
   }
   document.getElementById('enquiryForm').style.display = 'none';
   document.getElementById('fSuccess').style.display    = 'block';
-  if (CONFIG.GS_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
-    fetch(CONFIG.GS_URL, {
-      method  : 'POST',
-      headers : { 'Content-Type': 'application/json' },
-      body    : JSON.stringify({
-        type    : 'enquiry',
-        name    : name,
-        email   : email,
-        phone   : phone,
-        location: state,
-        need    : need,
-        message : msg,
-        date    : new Date().toISOString(),
-      }),
-    }).catch(function (err) {
-      console.error('[BMED] Enquiry POST failed:', err);
-    });
-  }
+
+  fetch(CONFIG.GS_URL, {
+    method  : 'POST',
+    mode    : 'no-cors',
+    headers : { 'Content-Type': 'text/plain' },
+    body    : JSON.stringify({
+      type    : 'enquiry',
+      name    : name,
+      email   : email,
+      phone   : phone,
+      location: state,
+      need    : need,
+      message : msg,
+      date    : new Date().toISOString(),
+    }),
+  }).catch(function (err) {
+    console.error('[BMED] Enquiry POST failed:', err);
+  });
 }
 
 function resetEnquiry() {
@@ -1399,41 +1399,33 @@ function doLogin(type) {
    ================================================================ */
 
 function doSignup() {
+  var hospital = document.querySelector('#p-signup input[placeholder="Hospital Name"]').value.trim();
+  var email    = document.querySelector('#p-signup input[type="email"]').value.trim();
+  var phone    = document.querySelector('#p-signup input[type="tel"]').value.trim();
+  var state    = document.querySelector('#p-signup select').value;
 
-  /* ── Uncomment for production ─────────────────────────────────
-  var name  = document.querySelector('#p-signup input[placeholder="Hospital Name"]').value.trim();
-  var email = document.querySelector('#p-signup input[type="email"]').value.trim();
-  var phone = document.querySelector('#p-signup input[type="tel"]').value.trim();
-  var state = document.querySelector('#p-signup select').value;
-
-  if (!name || !email || !phone || !state) {
+  if (!hospital || !email || !phone || !state) {
     alert('Please fill in all fields to register.');
     return;
   }
 
-  if (CONFIG.GS_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL_HERE') {
-    fetch(CONFIG.GS_URL, {
-      method  : 'POST',
-      headers : { 'Content-Type': 'application/json' },
-      body    : JSON.stringify({
-        type     : 'signup',
-        hospital : name,
-        email    : email,
-        phone    : phone,
-        state    : state,
-        date     : new Date().toISOString(),
-      }),
-    }).catch(function (err) {
-      console.error('[BMED] Signup POST failed:', err);
-    });
-  }
-  ─────────────────────────────────────────────────────────────── */
+  fetch(CONFIG.GS_URL, {
+    method  : 'POST',
+    mode    : 'no-cors',
+    headers : { 'Content-Type': 'text/plain' },
+    body    : JSON.stringify({
+      type     : 'signup',
+      hospital : hospital,
+      email    : email,
+      phone    : phone,
+      state    : state,
+      date     : new Date().toISOString(),
+    }),
+  }).catch(function (err) {
+    console.error('[BMED] Signup POST failed:', err);
+  });
 
-  alert(
-    'Registration submitted!\n\n' +
-    'Our team will review your details and activate your\n' +
-    'account within 24 hours. A confirmation email will follow.'
-  );
+  alert('Registration submitted! Our team will review your details and activate your account within 24 hours. Check your email for confirmation.');
   closeModal();
 }
 
@@ -1473,10 +1465,6 @@ function closeDash() {
 function handleDashBg(e) {
   if (e.target === document.getElementById('dashBg')) closeDash();
 }
-
-/* ================================================================
-   12. INITIALISATION
-   ================================================================ */
 
 (function init() {
   showSection('hero');
